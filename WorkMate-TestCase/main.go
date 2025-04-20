@@ -43,7 +43,10 @@ func main() {
 	// Создаю маршруты и присваиваю им нужные хендлеры
 	mux.HandleFunc("/", mainPageHandler)
 	mux.HandleFunc("/create", createTaskHandler)
-	mux.HandleFunc("/result", resultTaskHandler)
+	mux.HandleFunc("/result/", resultTaskHandler)
+
+	// Добавлю еще хендлер для вывода всех задач
+	mux.HandleFunc("/tasks/", allTasksHandler)
 
 	// Прописываю запуск сервера и сразу обрабатываю ошибку
 	if err := http.ListenAndServe(":8080", mux); err != nil {
@@ -94,6 +97,7 @@ func executeTask(task *Task) {
 	// Меняю статус задачи на успешный
 	taskMutex.Lock()
 	task.TaskStatus = StatusDone
+	task.Result = "Задача успешно выполнена!"
 	taskMutex.Unlock()
 }
 
@@ -102,7 +106,7 @@ func resultTaskHandler(resp http.ResponseWriter, req *http.Request) {
 	// Получаю id и query параметров запроса
 	id := req.URL.Query().Get("id")
 	if id == "" {
-		fmt.Fprintf(resp, "Не передан id задачи")
+		http.Error(resp, "Не передан id задачи", http.StatusBadRequest)
 		return
 	}
 
@@ -111,11 +115,24 @@ func resultTaskHandler(resp http.ResponseWriter, req *http.Request) {
 	task, ok := tasks[id]
 	taskMutex.Unlock()
 	if !ok {
-		fmt.Fprintf(resp, "Не найдено такой задачи :(")
+		http.Error(resp, "Не найдено такой задачи :(", http.StatusNotFound)
 		return
 	}
 
 	// Если все проверки пройдены, то вывожу json с данными задачи
 	resp.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(resp).Encode(task.Result)
+	json.NewEncoder(resp).Encode(task)
+}
+
+// Прописываю хендлер для вывода всех существующих задач
+func allTasksHandler(resp http.ResponseWriter, req *http.Request) {
+	taskMutex.Lock()
+	task := tasks
+	taskMutex.Unlock()
+	if len(task) == 0 {
+		http.Error(resp, "Нет ни одной задачи", http.StatusNotFound)
+	}
+
+	resp.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(resp).Encode(task)
 }
