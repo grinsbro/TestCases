@@ -103,7 +103,7 @@ func executeTask(task *Task) {
 
 // Прописываю хендлер для вывода результата задачи
 func resultTaskHandler(resp http.ResponseWriter, req *http.Request) {
-	// Получаю id и query параметров запроса
+	// Получаю id из query параметров запроса
 	id := req.URL.Query().Get("id")
 	if id == "" {
 		http.Error(resp, "Не передан id задачи", http.StatusBadRequest)
