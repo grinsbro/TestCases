@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"log"
+	"math/rand/v2"
 	"net/http"
 	"sync"
 	"time"
@@ -16,7 +17,7 @@ type TaskStatus string
 // Записываю константы для статусов, чтобы затем можно было легко добавлять различные статусы
 const (
 	StatusRunning TaskStatus = "Задача выполняется..."
-	StatusPending TaskStatus = "Задача в обработке..."
+	StatusPending TaskStatus = "Задача обрабатывается..."
 	StatusDone    TaskStatus = "Задача выполнена..."
 )
 
@@ -78,4 +79,43 @@ func createTaskHandler(resp http.ResponseWriter, req *http.Request) {
 	resp.Header().Set("Content-Type", "application/json")
 	// Вывожу эти данные
 	json.NewEncoder(resp).Encode(task)
+}
+
+// Добавляю функцию, которая будет выполнять задачу
+func executeTask(task *Task) {
+	// Меняю статус задачи
+	taskMutex.Lock()
+	task.TaskStatus = StatusPending
+	taskMutex.Unlock()
+
+	// Симулирую долгую I/O задачу
+	time.Sleep(time.Minute * time.Duration(rand.IntN(3)+3))
+
+	// Меняю статус задачи на успешный
+	taskMutex.Lock()
+	task.TaskStatus = StatusDone
+	taskMutex.Unlock()
+}
+
+// Прописываю хендлер для вывода результата задачи
+func resultTaskHandler(resp http.ResponseWriter, req *http.Request) {
+	// Получаю id и query параметров запроса
+	id := req.URL.Query().Get("id")
+	if id == "" {
+		fmt.Fprintf(resp, "Не передан id задачи")
+		return
+	}
+
+	// Получаю значение из мапы с задачами
+	taskMutex.Lock()
+	task, ok := tasks[id]
+	taskMutex.Unlock()
+	if !ok {
+		fmt.Fprintf(resp, "Не найдено такой задачи :(")
+		return
+	}
+
+	// Если все проверки пройдены, то вывожу json с данными задачи
+	resp.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(resp).Encode(task.Result)
 }
